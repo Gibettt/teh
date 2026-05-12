@@ -1,0 +1,234 @@
+{
+  "users": [
+    {
+      "id": "u-001",
+      "name": "Admin Tea Factory",
+      "email": "admin@teh.local",
+      "password": "admin123",
+      "role": "admin"
+    }
+  ],
+  "batches": [
+    {
+      "id": "26f90826-ae57-447b-8fc0-885824255cbe",
+      "batchCode": "TEA-20042026-01",
+      "teaType": "Black Tea",
+      "gardenBlock": "Block A1",
+      "harvestDate": "2026-04-20T19:29",
+      "notes": "a",
+      "workflowMode": "dynamic-multi-path",
+      "status": "in_progress",
+      "createdAt": "2026-04-20T12:31:37.807Z",
+      "createdBy": "Admin Tea Factory",
+      "trace": {
+        "batchRegistration": {
+          "txHash": "0x2875c1983e88e7655cf9cbd47b23b519b546d4c12341ba0ac5fc0a109af811af",
+          "txUrl": "https://sepolia.etherscan.io/tx/0x2875c1983e88e7655cf9cbd47b23b519b546d4c12341ba0ac5fc0a109af811af",
+          "network": "sepolia",
+          "chainId": 11155111,
+          "contractAddress": "0x590B52858Ed440855b2B51086d91B4b284aFaD24",
+          "mock": false
+        }
+      },
+      "stages": [
+        {
+          "stageName": "plucking",
+          "label": "Plucking",
+          "skippable": false,
+          "prerequisiteStages": [],
+          "status": "completed",
+          "completed": true,
+          "skipped": false,
+          "skipReason": null,
+          "ipfsCid": "Qme3tnBrLnihVFq5HnM31XYFUmsW9UwiQ48UwYC6GBCHts",
+          "ipfsUrl": "https://sapphire-wrong-deer-719.mypinata.cloud/ipfs/Qme3tnBrLnihVFq5HnM31XYFUmsW9UwiQ48UwYC6GBCHts",
+          "txHash": "0xdd2ac1cbe674d0f4704dc05392146dc173f64278d184649aa8fc2944876f19a5",
+          "txUrl": "https://sepolia.etherscan.io/tx/0xdd2ac1cbe674d0f4704dc05392146dc173f64278d184649aa8fc2944876f19a5",
+          "network": "sepolia",
+          "chainId": 11155111,
+          "contractAddress": "0x590B52858Ed440855b2B51086d91B4b284aFaD24",
+          "timestamp": "2026-04-20T12:34:05.691Z",
+          "operator": "Admin Tea Factory",
+          "payload": {
+            "eventType": "stage_completed",
+            "batchId": "26f90826-ae57-447b-8fc0-885824255cbe",
+            "batchCode": "TEA-20042026-01",
+            "teaType": "Black Tea",
+            "stageName": "plucking",
+            "operator": "Admin Tea Factory",
+            "timestamp": "2026-04-20T12:34:05.691Z",
+            "data": {
+              "operatorShift": "a",
+              "leafGrade": "a",
+              "weightKg": "a",
+              "location": "",
+              "notes": ""
+            },
+            "meta": {
+              "ipfsProvider": "pinata",
+              "blockchain": {
+                "enabled": true,
+                "network": "sepolia",
+                "chainId": 11155111,
+                "explorerBaseUrl": "https://sepolia.etherscan.io",
+                "contractAddress": "0x590B52858Ed440855b2B51086d91B4b284aFaD24"
+              },
+              "action": "completed",
+              "workflowMode": "dynamic-multi-path",
+              "skipBehavior": "manual-from-start"
+            }
+          },
+          "ipfsName": "TEA-20042026-01-plucking-1776688445697",
+          "mock": {
+            "ipfs": false,
+            "blockchain": false
+          }
+        },
+        {
+          "stageName": "withering",
+          "label": "Withering",
+          "skippable": false,
+          "prerequisiteStages": [
+            "plucking"
+          ],
+          "status": "available",
+          "completed": false,
+          "skipped": false,
+          "skipReason": null,
+          "ipfsCid": null,
+          "ipfsUrl": null,
+          "txHash": null,
+          "txUrl": null,
+          "network": null,
+          "chainId": null,
+          "contractAddress": null,
+          "timestamp": null,
+          "operator": null,
+          "payload": null,
+          "ipfsName": null,
+          "mock": null
+        },
+        {
+          "stageName": "rolling",
+          "label": "Rolling",
+          "skippable": true,
+          "prerequisiteStages": [
+            "withering"
+          ],
+          "status": "pending",
+          "completed": false,
+          "skipped": false,
+          "skipReason": null,
+          "ipfsCid": null,
+          "ipfsUrl": null,
+          "txHash": null,
+          "txUrl": null,
+          "network": null,
+          "chainId": null,
+          "contractAddress": null,
+          "timestamp": null,
+          "operator": null,
+          "payload": null,
+          "ipfsName": null,
+          "mock": null
+        },
+        {
+          "stageName": "predrying",
+          "label": "Pre-Drying",
+          "skippable": false,
+          "prerequisiteStages": [
+            "withering"
+          ],
+          "status": "pending",
+          "completed": false,
+          "skipped": false,
+          "skipReason": null,
+          "ipfsCid": null,
+          "ipfsUrl": null,
+          "txHash": null,
+          "txUrl": null,
+          "network": null,
+          "chainId": null,
+          "contractAddress": null,
+          "timestamp": null,
+          "operator": null,
+          "payload": null,
+          "ipfsName": null,
+          "mock": null
+        },
+        {
+          "stageName": "drying",
+          "label": "Drying",
+          "skippable": false,
+          "prerequisiteStages": [
+            "predrying"
+          ],
+          "status": "pending",
+          "completed": false,
+          "skipped": false,
+          "skipReason": null,
+          "ipfsCid": null,
+          "ipfsUrl": null,
+          "txHash": null,
+          "txUrl": null,
+          "network": null,
+          "chainId": null,
+          "contractAddress": null,
+          "timestamp": null,
+          "operator": null,
+          "payload": null,
+          "ipfsName": null,
+          "mock": null
+        },
+        {
+          "stageName": "postdrying",
+          "label": "Post-Drying",
+          "skippable": true,
+          "prerequisiteStages": [
+            "drying"
+          ],
+          "status": "pending",
+          "completed": false,
+          "skipped": false,
+          "skipReason": null,
+          "ipfsCid": null,
+          "ipfsUrl": null,
+          "txHash": null,
+          "txUrl": null,
+          "network": null,
+          "chainId": null,
+          "contractAddress": null,
+          "timestamp": null,
+          "operator": null,
+          "payload": null,
+          "ipfsName": null,
+          "mock": null
+        },
+        {
+          "stageName": "packing",
+          "label": "Packing",
+          "skippable": false,
+          "prerequisiteStages": [
+            "drying"
+          ],
+          "status": "pending",
+          "completed": false,
+          "skipped": false,
+          "skipReason": null,
+          "ipfsCid": null,
+          "ipfsUrl": null,
+          "txHash": null,
+          "txUrl": null,
+          "network": null,
+          "chainId": null,
+          "contractAddress": null,
+          "timestamp": null,
+          "operator": null,
+          "payload": null,
+          "ipfsName": null,
+          "mock": null
+        }
+      ]
+    }
+  ]
+}
