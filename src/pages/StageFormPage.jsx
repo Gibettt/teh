@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import Topbar from "../components/Topbar";
 import api from "../services/api";
 import { humanStage } from "../utils/formatters";
+import { useLanguage } from "../contexts/LanguageContext";
 
 const stageTemplates = {
   plucking: { operatorShift: "", leafGrade: "", weightKg: "", location: "", notes: "" },
@@ -17,6 +18,7 @@ const stageTemplates = {
 export default function StageFormPage() {
   const { id, stageName } = useParams();
   const { openSidebar } = useOutletContext();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [form, setForm] = useState(stageTemplates[stageName] || { notes: "" });
   const [loading, setLoading] = useState(false);
@@ -32,7 +34,7 @@ export default function StageFormPage() {
       await api.post(`/batches/${id}/stages/${stageName}`, form);
       navigate(`/batches/${id}`);
     } catch (err) {
-      setError(err.response?.data?.message || "Gagal menyimpan tahapan");
+      setError(err.response?.data?.message || t("stageForm.error"));
     } finally {
       setLoading(false);
     }
@@ -41,14 +43,13 @@ export default function StageFormPage() {
   return (
     <div>
       <Topbar
-        title={`Input Tahap ${humanStage(stageName)}`}
-        subtitle="Data tahap akan disimpan ke Supabase dan Pinata dulu. CID baru dicatat ke blockchain setelah semua tahap final."
+        title={t("stageForm.title", { stage: humanStage(stageName) })}
         onOpenMenu={openSidebar}
         showCreate={false}
       />
-      <div className="p-4 lg:p-8">
-        <form className="card-paper mx-auto max-w-4xl p-6 lg:p-8" onSubmit={handleSubmit}>
-          <div className="grid gap-5 md:grid-cols-2">
+      <div className="p-3 sm:p-4 lg:p-8">
+        <form className="card-paper mx-auto max-w-4xl p-4 sm:p-6 lg:p-8" onSubmit={handleSubmit}>
+          <div className="grid gap-4 md:grid-cols-2 lg:gap-5">
             {fields.map((field) => (
               <div key={field} className={field === "notes" ? "md:col-span-2" : ""}>
                 <label className="label">{field}</label>
@@ -63,25 +64,21 @@ export default function StageFormPage() {
                     className="input"
                     value={form[field]}
                     onChange={(e) => setForm((prev) => ({ ...prev, [field]: e.target.value }))}
-                    placeholder={`Masukkan ${field}`}
+                    placeholder={t("stageForm.placeholder", { field })}
                   />
                 )}
               </div>
             ))}
           </div>
 
-          <div className="surface-muted mt-5 rounded-[26px] p-4 text-sm text-slate-600">
-            Setelah disimpan, backend membentuk payload JSON tahap ini, menyimpannya ke Supabase, lalu mengirimkannya ke Pinata. Blockchain diproses otomatis saat seluruh tahap selesai atau di-skip.
-          </div>
-
           {error && <div className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-            <button type="button" className="btn-secondary" onClick={() => navigate(-1)}>
-              Batal
+            <button type="button" className="btn-secondary w-full sm:w-auto" onClick={() => navigate(-1)}>
+              {t("common.cancel")}
             </button>
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? "Menyimpan ke IPFS..." : "Simpan Tahap"}
+            <button type="submit" className="btn-primary w-full sm:w-auto" disabled={loading}>
+              {loading ? t("stageForm.saving") : t("stageForm.save")}
             </button>
           </div>
         </form>

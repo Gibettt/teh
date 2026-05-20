@@ -95,10 +95,10 @@ function DisconnectWalletButton() {
 function ConnectedWalletControls({ account, chain, openAccountModal, openChainModal }) {
   if (chain.unsupported) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <button className="wallet-chip wallet-chip-warning" onClick={openChainModal} type="button">
           <AlertTriangle size={16} />
-          <span>Wrong Network</span>
+          <span className="hidden sm:inline">Wrong Network</span>
         </button>
         <DisconnectWalletButton />
       </div>
@@ -106,7 +106,7 @@ function ConnectedWalletControls({ account, chain, openAccountModal, openChainMo
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
       <button className="wallet-chip hidden sm:inline-flex" onClick={openChainModal} type="button">
         {chain.hasIcon && chain.iconUrl ? (
           <span className="inline-flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-white/70 bg-white">
@@ -119,7 +119,7 @@ function ConnectedWalletControls({ account, chain, openAccountModal, openChainMo
       </button>
       <button className="wallet-chip wallet-chip-strong" onClick={openAccountModal} type="button">
         <Wallet size={16} />
-        <span>{account.displayName}</span>
+        <span className="max-w-24 truncate sm:max-w-32">{account.displayName}</span>
         <ChevronDown size={14} />
       </button>
       <DisconnectWalletButton />
@@ -148,6 +148,7 @@ export default function WalletConnectButton() {
 
         return (
           <div
+            className="min-w-0"
             {...(!ready && {
               "aria-hidden": true,
               style: {
@@ -160,7 +161,8 @@ export default function WalletConnectButton() {
             {!connected ? (
               <button className="wallet-chip" onClick={openConnectModal} type="button">
                 <Wallet size={16} />
-                <span>Connect Wallet</span>
+                <span className="hidden min-[380px]:inline">Connect Wallet</span>
+                <span className="min-[380px]:hidden">Wallet</span>
               </button>
             ) : (
               <ConnectedWalletControls

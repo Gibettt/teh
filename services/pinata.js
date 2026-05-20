@@ -1,20 +1,35 @@
 import crypto from "crypto";
+import dotenv from "dotenv";
 
 const DEFAULT_GATEWAY = "gateway.pinata.cloud";
 
 function buildName(payload) {
-  return `${payload.batchCode}-${payload.stageName}-${Date.now()}`;
+  const batchCode = payload.batch?.batchCode || payload.batchCode || "batch";
+  const documentType = payload.documentType || payload.stageName || "trace";
+  const safeBatchCode = String(batchCode).replace(/[^a-z0-9-_]/gi, "-");
+  const safeDocumentType = String(documentType).replace(/[^a-z0-9-_]/gi, "-");
+  return `${safeBatchCode}-${safeDocumentType}-${Date.now()}.json`;
+}
+
+function buildPrettyJson(payload) {
+  return `${JSON.stringify(payload, null, 2)}\n`;
+}
+
+function refreshEnv() {
+  dotenv.config({ override: true });
 }
 
 export async function uploadJsonToIpfs(payload) {
+  refreshEnv();
   const jwt = process.env.PINATA_JWT;
   const gateway = process.env.PINATA_GATEWAY || DEFAULT_GATEWAY;
   const name = buildName(payload);
+  const content = buildPrettyJson(payload);
 
   if (!jwt) {
     const fakeCid = `bafy${crypto
       .createHash("sha256")
-      .update(JSON.stringify(payload))
+      .update(content)
       .digest("hex")
       .slice(0, 40)}`;
 
@@ -26,18 +41,25 @@ export async function uploadJsonToIpfs(payload) {
     };
   }
 
-  const response = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
+  const formData = new FormData();
+  formData.append("file", new Blob([content], { type: "application/json" }), name);
+  formData.append(
+    "pinataMetadata",
+    JSON.stringify({
+      name,
+      keyvalues: {
+        documentType: payload.documentType || payload.eventType || "traceability_json",
+        batchCode: payload.batch?.batchCode || payload.batchCode || "",
+      },
+    })
+  );
+
+  const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       Authorization: `Bearer ${jwt}`,
     },
-    body: JSON.stringify({
-      pinataMetadata: {
-        name,
-      },
-      pinataContent: payload,
-    }),
+    body: formData,
   });
 
   if (!response.ok) {

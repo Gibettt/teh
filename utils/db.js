@@ -166,6 +166,16 @@ function toHistoryRow(entry) {
     reason: entry.reason || null,
     payload: entry.payload || null,
     data: typeof entry.data === "undefined" ? null : entry.data,
+    ipfs_cid: entry.ipfsCid || null,
+    ipfs_url: entry.ipfsUrl || null,
+    ipfs_name: entry.ipfsName || null,
+    tx_hash: entry.txHash || null,
+    tx_url: entry.txUrl || null,
+    network: entry.network || null,
+    chain_id: entry.chainId || null,
+    contract_address: entry.contractAddress || null,
+    mock: entry.mock || null,
+    error_message: entry.errorMessage || null,
     recorded_at: entry.recordedAt || entry.timestamp || new Date().toISOString(),
   };
 }

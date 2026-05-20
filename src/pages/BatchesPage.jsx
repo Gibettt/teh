@@ -3,9 +3,11 @@ import { useOutletContext } from "react-router-dom";
 import Topbar from "../components/Topbar";
 import BatchTable from "../components/BatchTable";
 import api from "../services/api";
+import { useLanguage } from "../contexts/LanguageContext";
 
 export default function BatchesPage() {
   const { openSidebar } = useOutletContext();
+  const { t } = useLanguage();
   const [batches, setBatches] = useState([]);
 
   useEffect(() => {
@@ -15,11 +17,10 @@ export default function BatchesPage() {
   return (
     <div>
       <Topbar
-        title="Batch Produksi"
-        subtitle="Kelola seluruh batch produksi, cek tahapan aktif, dan masuk ke detail jalur multi-path setiap batch."
+        title={t("batches.title")}
         onOpenMenu={openSidebar}
       />
-      <div className="p-4 lg:p-8">
+      <div className="p-3 sm:p-4 lg:p-8">
         <BatchTable batches={batches} />
       </div>
     </div>

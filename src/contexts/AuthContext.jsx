@@ -1,9 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import api from "../services/api";
+import { useLanguage } from "./LanguageContext";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
+  const { t } = useLanguage();
   const [user, setUser] = useState(() => {
     const raw = localStorage.getItem("tea-traceability-user");
     return raw ? JSON.parse(raw) : null;
@@ -21,7 +23,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       return {
         ok: false,
-        message: error.response?.data?.message || "Login gagal",
+        message: error.response?.data?.message || t("login.error"),
       };
     } finally {
       setLoading(false);
@@ -48,7 +50,7 @@ export function AuthProvider({ children }) {
       logout,
       isAuthenticated: Boolean(user),
     }),
-    [user, loading]
+    [user, loading, t]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

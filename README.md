@@ -9,7 +9,9 @@ Aplikasi ini sudah disatukan menjadi satu folder dan satu package. Untuk develop
 - integrasi **wagmi + RainbowKit** untuk wallet browser dan mobile wallet flow
 - batch memakai **dynamic multi-path** tanpa dropdown alur
 - tahap opsional bisa **di-skip dari awal proses**
-- complete/skip otomatis menyimpan JSON ke Pinata, mengambil CID, lalu mengirim CID ke smart contract Sepolia
+- complete/skip ditampung dulu di Supabase
+- saat batch final, seluruh tahap digabung menjadi satu JSON Pinata
+- CID final saja yang dikirim ke smart contract Sepolia lewat transaksi manual MetaMask
 
 ## Env
 
@@ -23,17 +25,18 @@ SUPABASE_PUBLISHABLE_KEY=
 VITE_SUPABASE_URL=https://pscobituhjquyrjpyhgx.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_API_URL=/api
+VITE_SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
 VITE_WALLETCONNECT_PROJECT_ID=
+VITE_CONTRACT_ADDRESS=
 JWT_SECRET=super-secret-key
 PINATA_JWT=
 PINATA_GATEWAY=
-RPC_URL=
-PRIVATE_KEY=
 CONTRACT_ADDRESS=
 BLOCK_EXPLORER_URL=https://sepolia.etherscan.io
 ```
 
 Isi `VITE_WALLETCONNECT_PROJECT_ID` agar flow WalletConnect/QR untuk mobile wallet aktif penuh.
+Isi `CONTRACT_ADDRESS` dan `VITE_CONTRACT_ADDRESS` dengan kontrak yang memiliki fungsi `storeIpfsCid(string ipfsCid)`. Tidak ada `PRIVATE_KEY`; transaksi Sepolia harus dikonfirmasi manual dari MetaMask owner kontrak.
 
 ## Supabase
 
@@ -67,7 +70,7 @@ npm run dev
 
 Browser akan terbuka otomatis dari Vite, biasanya di `http://localhost:5173`.
 
-Kalau butuh login, data batch, Pinata, atau blockchain, jalankan API di terminal kedua:
+Kalau butuh login, data batch, atau upload JSON final ke Pinata, jalankan API di terminal kedua:
 
 ```bash
 npm run api

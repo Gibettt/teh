@@ -21,13 +21,11 @@ import {
 } from "../utils/constants.js";
 import { uploadJsonToIpfs } from "../services/pinata.js";
 import {
-  appendStageOnChain,
-  createBatchOnChain,
   getBlockchainStatus,
+  getTxUrl,
 } from "../services/blockchain.js";
 
 const router = express.Router();
-router.use(requireAuth);
 
 function isFinalized(stage) {
   return stage?.status === "completed" || stage?.status === "skipped";
@@ -137,209 +135,189 @@ function normalizeBatch(batch) {
 
 async function normalizeAndPersistBatch(batch) {
   const normalized = normalizeBatch(batch);
+  const blockchainStatus = getBlockchainStatus();
+
+  if (
+    normalized.trace?.blockchainFinalization &&
+    normalized.trace.blockchainFinalization.status !== "anchored"
+  ) {
+    normalized.trace.blockchainFinalization = {
+      ...normalized.trace.blockchainFinalization,
+      network: blockchainStatus.network,
+      chainId: blockchainStatus.chainId,
+      contractAddress: blockchainStatus.contractAddress,
+      transactionMode: "manual_metamask",
+    };
+  }
+
   await updateBatch(normalized);
   return normalized;
 }
 
-function mergeMock(currentMock, patch) {
+const FINAL_TRACE_STAGE_NAME = "final_trace_json";
+const FINAL_TRACE_SCHEMA_VERSION = "tea-traceability-final-v3";
+
+function getBlockchainAnchorConfig() {
+  const blockchainStatus = getBlockchainStatus();
+
   return {
-    ...((currentMock && typeof currentMock === "object") ? currentMock : {}),
-    ...(patch || {}),
+    network: blockchainStatus.network,
+    chainId: blockchainStatus.chainId,
+    contractAddress: blockchainStatus.contractAddress,
+    transactionMode: "manual_metamask",
+    onChainPayload: "pinata_cid_only",
+    contractFunction: "storeIpfsCid(string ipfsCid)",
   };
 }
 
-function buildChainPatch(chain) {
+function buildStageJsonRecord(stage, index) {
+  const data = stage.payload?.data ?? null;
+  const reason = stage.payload?.reason ?? stage.skipReason ?? null;
+
   return {
-    txHash: chain.txHash,
-    txUrl: chain.txUrl,
-    network: chain.network,
-    chainId: chain.chainId,
-    contractAddress: chain.contractAddress,
-    mock: chain.mock,
+    order: index + 1,
+    stageName: stage.stageName,
+    label: stage.label || STAGE_LABELS[stage.stageName] || stage.stageName,
+    status: stage.status,
+    operator: stage.operator || null,
+    recordedAt: stage.timestamp || null,
+    data,
+    skipReason: stage.status === "skipped" ? reason : null,
   };
 }
 
-function applyChainToStage(stage, chain) {
-  Object.assign(stage, {
-    txHash: chain.txHash,
-    txUrl: chain.txUrl,
-    network: chain.network,
-    chainId: chain.chainId,
-    contractAddress: chain.contractAddress,
-    mock: mergeMock(stage.mock, {
-      blockchain: chain.mock,
-    }),
-  });
+function buildFinalTracePayload(batch, operator, timestamp) {
+  const finalizedStages = (batch.stages || []).filter(isFinalized);
+  const completedStages = finalizedStages.filter((stage) => stage.status === "completed");
+  const skippedStages = finalizedStages.filter((stage) => stage.status === "skipped");
+
+  return {
+    schemaVersion: FINAL_TRACE_SCHEMA_VERSION,
+    documentType: "tea_traceability_batch_final",
+    generatedAt: timestamp,
+    generatedBy: operator,
+    batch: {
+      batchCode: batch.batchCode,
+      teaType: batch.teaType,
+      gardenBlock: batch.gardenBlock || null,
+      harvestDate: batch.harvestDate || null,
+      notes: batch.notes || null,
+      status: batch.status,
+      createdAt: batch.createdAt,
+    },
+    summary: {
+      totalStages: batch.stages?.length || 0,
+      finalizedStages: finalizedStages.length,
+      completedStages: completedStages.length,
+      skippedStages: skippedStages.length,
+      finalStatus: batch.status,
+    },
+    stages: finalizedStages.map(buildStageJsonRecord),
+  };
 }
 
-function getFinalizedCidRecords(batch) {
-  const records = [];
-  const batchRegistration = batch.trace?.batchRegistration;
-
-  if (batchRegistration?.ipfsCid) {
-    records.push({
-      type: "batch",
-      name: "batch_registration",
-      cid: batchRegistration.ipfsCid,
-      historyId: batchRegistration.historyId,
-    });
-  }
-
-  for (const stage of batch.stages || []) {
-    if (isFinalized(stage)) {
-      if (!stage.ipfsCid) {
-        throw new Error(`CID Pinata tahap ${stage.stageName} belum tersedia.`);
-      }
-
-      records.push({
-        type: "stage",
-        name: `${stage.stageName}:${stage.status}`,
-        cid: stage.ipfsCid,
-        historyId: stage.historyId,
-        stage,
-      });
-    }
-  }
-
-  return records;
+function buildStagePayloadMeta(action) {
+  return {
+    storage: {
+      provider: "supabase",
+      finalJsonProvider: "pinata",
+      finalJsonTiming: "after_all_stages_finalized",
+    },
+    blockchainAnchor: {
+      ...getBlockchainAnchorConfig(),
+      status: "waiting_for_final_pinata_cid",
+    },
+    action,
+    workflowMode: "dynamic-multi-path",
+    skipBehavior: "manual-from-start",
+  };
 }
 
-async function finalizeBatchOnChainIfComplete(batch, operator) {
+async function createFinalTraceJsonIfComplete(batch, operator, options = {}) {
+  const force = Boolean(options.force);
+
   if (batch.status !== "completed") {
     return batch;
   }
 
-  if (batch.trace?.blockchainFinalization?.status === "anchored") {
+  if (batch.trace?.blockchainFinalization?.status === "anchored" && batch.trace?.finalTrace?.ipfsCid) {
     return batch;
   }
 
+  if (!force && batch.trace?.finalTrace?.schemaVersion === FINAL_TRACE_SCHEMA_VERSION && batch.trace.finalTrace.ipfsCid) {
+    return batch;
+  }
+
+  if (force && batch.trace?.blockchainFinalization?.status === "anchored") {
+    throw new Error("JSON final tidak bisa dibuat ulang karena CID lama sudah tercatat di blockchain.");
+  }
+
   const timestamp = new Date().toISOString();
-  const cidRecords = getFinalizedCidRecords(batch);
-  const payload = {
-    eventType: "batch_blockchain_finalized",
-    batchId: batch.id,
-    batchCode: batch.batchCode,
-    teaType: batch.teaType,
-    operator,
-    timestamp,
-    cids: cidRecords.map(({ type, name, cid }) => ({ type, name, cid })),
-    meta: {
-      blockchain: getBlockchainStatus(),
-      action: "finalized",
-      workflowMode: "dynamic-multi-path",
-      behavior: "push-cids-after-all-stages-finalized",
-    },
-  };
+  const payload = buildFinalTracePayload(batch, operator, timestamp);
 
   const history = await createHistoryEntry({
     batchId: batch.id,
     batchCode: batch.batchCode,
-    eventType: "batch_blockchain_finalized",
-    action: "finalized",
+    stageName: FINAL_TRACE_STAGE_NAME,
+    eventType: "batch_final_trace_json",
+    action: "final_json_created",
     operator,
     payload,
     timestamp,
-    status: "pending_blockchain",
+    status: "pending_ipfs",
   });
 
   batch.trace = {
     ...(batch.trace || {}),
-    blockchainFinalization: {
-      status: "pending_blockchain",
+    finalTrace: {
+      status: "pending_ipfs",
       historyId: history.id,
-      timestamp,
+      generatedAt: timestamp,
     },
   };
   await updateBatch(batch);
 
   try {
-    const batchChain = await createBatchOnChain(batch.batchCode, batch.teaType);
-    const chainRecords = [];
+    const ipfs = await uploadJsonToIpfs(payload);
+    const blockchainStatus = getBlockchainStatus();
 
-    batch.trace.batchRegistration = {
-      ...(batch.trace.batchRegistration || {}),
-      blockchainStatus: "batch_registered",
-      createTxHash: batchChain.txHash,
-      createTxUrl: batchChain.txUrl,
-      network: batchChain.network,
-      chainId: batchChain.chainId,
-      contractAddress: batchChain.contractAddress,
-      mock: mergeMock(batch.trace.batchRegistration?.mock, {
-        blockchainCreate: batchChain.mock,
-      }),
-      alreadyExists: batchChain.alreadyExists || false,
-    };
-
-    for (const record of cidRecords) {
-      const chain = await appendStageOnChain(batch.batchCode, record.name, record.cid);
-      chainRecords.push({
-        type: record.type,
-        name: record.name,
-        cid: record.cid,
-        txHash: chain.txHash,
-        txUrl: chain.txUrl,
-      });
-
-      if (record.stage) {
-        applyChainToStage(record.stage, chain);
-        if (record.historyId) {
-          await updateHistoryEntry(record.historyId, {
-            status: "anchored",
-            ...buildChainPatch(chain),
-            mock: mergeMock(record.stage.mock, {
-              blockchain: chain.mock,
-            }),
-          });
-        }
-      } else {
-        batch.trace.batchRegistration = {
-          ...batch.trace.batchRegistration,
-          txHash: chain.txHash,
-          txUrl: chain.txUrl,
-          network: chain.network,
-          chainId: chain.chainId,
-          contractAddress: chain.contractAddress,
-          mock: mergeMock(batch.trace.batchRegistration.mock, {
-            blockchain: chain.mock,
-          }),
-        };
-
-        if (record.historyId) {
-          await updateHistoryEntry(record.historyId, {
-            status: "anchored",
-            ...buildChainPatch(chain),
-            mock: mergeMock(batch.trace.batchRegistration.mock, {
-              blockchain: chain.mock,
-            }),
-          });
-        }
-      }
-    }
-
-    batch.trace.blockchainFinalization = {
-      status: "anchored",
+    batch.trace.finalTrace = {
+      status: "ipfs_stored",
+      schemaVersion: FINAL_TRACE_SCHEMA_VERSION,
       historyId: history.id,
-      timestamp,
-      finalizedAt: new Date().toISOString(),
-      records: chainRecords,
+      generatedAt: timestamp,
+      ipfsCid: ipfs.cid,
+      ipfsUrl: ipfs.url,
+      ipfsName: ipfs.name,
+      mock: {
+        ipfs: ipfs.mock,
+      },
+    };
+    batch.trace.blockchainFinalization = {
+      status: "awaiting_wallet_signature",
+      finalCid: ipfs.cid,
+      finalIpfsUrl: ipfs.url,
+      network: blockchainStatus.network,
+      chainId: blockchainStatus.chainId,
+      contractAddress: blockchainStatus.contractAddress,
+      transactionMode: "manual_metamask",
     };
 
     await updateHistoryEntry(history.id, {
-      status: "anchored",
-      payload: {
-        ...payload,
-        chainRecords,
-      },
+      status: "ipfs_stored",
+      ipfsCid: ipfs.cid,
+      ipfsUrl: ipfs.url,
+      ipfsName: ipfs.name,
       mock: {
-        blockchain: batchChain.mock,
+        ipfs: ipfs.mock,
       },
     });
 
     await updateBatch(batch);
     return batch;
   } catch (error) {
-    batch.trace.blockchainFinalization = {
-      ...(batch.trace.blockchainFinalization || {}),
+    batch.trace.finalTrace = {
+      ...(batch.trace.finalTrace || {}),
       status: "failed",
       errorMessage: error.message,
       failedAt: new Date().toISOString(),
@@ -365,16 +343,7 @@ async function createStageRecord({ batch, stageName, eventType, action, operator
     timestamp,
     ...(typeof data !== "undefined" ? { data } : {}),
     ...(typeof reason !== "undefined" ? { reason } : {}),
-    meta: {
-      ipfsProvider: "pinata",
-      blockchain: {
-        ...getBlockchainStatus(),
-        deferredUntilBatchCompleted: true,
-      },
-      action,
-      workflowMode: "dynamic-multi-path",
-      skipBehavior: "manual-from-start",
-    },
+    meta: buildStagePayloadMeta(action),
   };
 
   const history = await createHistoryEntry({
@@ -388,36 +357,98 @@ async function createStageRecord({ batch, stageName, eventType, action, operator
     reason,
     payload,
     timestamp,
-    status: "pending_ipfs",
+    status: "stored_supabase",
   });
 
-  try {
-    const ipfs = await uploadJsonToIpfs(payload);
-
-    await updateHistoryEntry(history.id, {
-      status: "ipfs_stored",
-      ipfsCid: ipfs.cid,
-      ipfsUrl: ipfs.url,
-      ipfsName: ipfs.name,
-      mock: {
-        ipfs: ipfs.mock,
-      },
-    });
-
-    return {
-      timestamp,
-      payload,
-      ipfs,
-      history,
-    };
-  } catch (error) {
-    await updateHistoryEntry(history.id, {
-      status: "failed",
-      errorMessage: error.message,
-    });
-    throw error;
-  }
+  return {
+    timestamp,
+    payload,
+    history,
+  };
 }
+
+function buildTraceabilityStage(stage, index) {
+  return {
+    order: index + 1,
+    stageName: stage.stageName,
+    label: stage.label || STAGE_LABELS[stage.stageName] || stage.stageName,
+    status: stage.status,
+    operator: stage.operator || null,
+    recordedAt: stage.timestamp || null,
+    data: stage.payload?.data || null,
+  };
+}
+
+function buildTraceabilityResponse(batch, options = {}) {
+  const hideSkipped = Boolean(options.hideSkipped);
+  const normalized = normalizeBatch(batch);
+  const visibleStages = hideSkipped
+    ? normalized.stages.filter((stage) => stage.status !== "skipped")
+    : normalized.stages;
+  const completedStages = visibleStages.filter((stage) => stage.status === "completed");
+  const finalTrace = normalized.trace?.finalTrace || null;
+  const blockchainFinalization = normalized.trace?.blockchainFinalization || null;
+
+  return {
+    batch: {
+      id: normalized.id,
+      batchCode: normalized.batchCode,
+      teaType: normalized.teaType,
+      gardenBlock: normalized.gardenBlock || null,
+      harvestDate: normalized.harvestDate || null,
+      notes: normalized.notes || null,
+      status: normalized.status,
+      createdAt: normalized.createdAt,
+      workflowMode: normalized.workflowMode || "dynamic-multi-path",
+    },
+    summary: {
+      totalStagesShown: visibleStages.length,
+      completedStages: completedStages.length,
+      hiddenSkippedStages: hideSkipped
+        ? normalized.stages.filter((stage) => stage.status === "skipped").length
+        : 0,
+    },
+    finalTrace: finalTrace
+      ? {
+          status: finalTrace.status || null,
+          schemaVersion: finalTrace.schemaVersion || null,
+          generatedAt: finalTrace.generatedAt || null,
+          ipfsCid: finalTrace.ipfsCid || null,
+          ipfsUrl: finalTrace.ipfsUrl || null,
+        }
+      : null,
+    blockchainFinalization: blockchainFinalization
+      ? {
+          status: blockchainFinalization.status || null,
+          finalCid: blockchainFinalization.finalCid || null,
+          finalIpfsUrl: blockchainFinalization.finalIpfsUrl || null,
+          txHash: blockchainFinalization.txHash || null,
+          txUrl: blockchainFinalization.txUrl || null,
+          network: blockchainFinalization.network || null,
+          chainId: blockchainFinalization.chainId || null,
+          contractAddress: blockchainFinalization.contractAddress || null,
+          anchoredAt: blockchainFinalization.anchoredAt || null,
+        }
+      : null,
+    stages: visibleStages.map(buildTraceabilityStage),
+  };
+}
+
+router.get("/public/:id/traceability", async (req, res) => {
+  try {
+    const batch = await getBatchById(req.params.id);
+
+    if (!batch) {
+      return res.status(404).json({ message: "Traceability tidak ditemukan" });
+    }
+
+    return res.json(buildTraceabilityResponse(batch, { hideSkipped: true }));
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+router.use(requireAuth);
 
 router.get("/", async (req, res) => {
   try {
@@ -438,7 +469,8 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ message: "Batch tidak ditemukan" });
     }
 
-    res.json(await normalizeAndPersistBatch(batch));
+    const normalized = await normalizeAndPersistBatch(batch);
+    res.json(await createFinalTraceJsonIfComplete(normalized, req.user.name));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -472,7 +504,7 @@ router.post("/", async (req, res) => {
       createdBy: req.user.name,
       trace: {
         batchRegistration: {
-          status: "pending_ipfs",
+          status: "stored_supabase",
         },
       },
       stages: buildDefaultStages(),
@@ -494,9 +526,14 @@ router.post("/", async (req, res) => {
         notes,
       },
       meta: {
-        blockchain: {
-          ...getBlockchainStatus(),
-          deferredUntilBatchCompleted: true,
+        storage: {
+          provider: "supabase",
+          finalJsonProvider: "pinata",
+          finalJsonTiming: "after_all_stages_finalized",
+        },
+        blockchainAnchor: {
+          ...getBlockchainAnchorConfig(),
+          status: "waiting_for_final_pinata_cid",
         },
         action: "created",
         workflowMode: "dynamic-multi-path",
@@ -510,45 +547,19 @@ router.post("/", async (req, res) => {
       action: "created",
       operator: req.user.name,
       timestamp: createdAt,
-      status: "pending_ipfs",
+      status: "stored_supabase",
       payload,
     });
 
-    try {
-      const ipfs = await uploadJsonToIpfs(payload);
+    batch.trace = {
+      batchRegistration: {
+        status: "stored_supabase",
+        historyId: history.id,
+      },
+    };
 
-      batch.trace = {
-        batchRegistration: {
-          status: "ipfs_stored",
-          ipfsCid: ipfs.cid,
-          ipfsUrl: ipfs.url,
-          ipfsName: ipfs.name,
-          mock: {
-            ipfs: ipfs.mock,
-          },
-          historyId: history.id,
-        },
-      };
-
-      await updateBatch(batch);
-      await updateHistoryEntry(history.id, {
-        status: "ipfs_stored",
-        ipfsCid: ipfs.cid,
-        ipfsUrl: ipfs.url,
-        ipfsName: ipfs.name,
-        mock: {
-          ipfs: ipfs.mock,
-        },
-      });
-
-      return res.status(201).json(batch);
-    } catch (error) {
-      await updateHistoryEntry(history.id, {
-        status: "failed",
-        errorMessage: error.message,
-      });
-      throw error;
-    }
+    await updateBatch(batch);
+    return res.status(201).json(batch);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -591,8 +602,8 @@ router.post("/:id/stages/:stageName", async (req, res) => {
       completed: true,
       skipped: false,
       skipReason: null,
-      ipfsCid: record.ipfs.cid,
-      ipfsUrl: record.ipfs.url,
+      ipfsCid: null,
+      ipfsUrl: null,
       txHash: null,
       txUrl: null,
       network: null,
@@ -601,18 +612,16 @@ router.post("/:id/stages/:stageName", async (req, res) => {
       timestamp: record.timestamp,
       operator: req.user.name,
       payload: record.payload,
-      ipfsName: record.ipfs.name,
+      ipfsName: null,
       historyId: record.history.id,
-      mock: {
-        ipfs: record.ipfs.mock,
-      },
+      mock: null,
     });
 
     refreshAvailableStages(batch);
     batch.status = deriveBatchStatus(batch.stages);
 
     await updateBatch(batch);
-    return res.json(await finalizeBatchOnChainIfComplete(batch, req.user.name));
+    return res.json(await createFinalTraceJsonIfComplete(batch, req.user.name));
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -658,8 +667,8 @@ router.post("/:id/stages/:stageName/skip", async (req, res) => {
       completed: false,
       skipped: true,
       skipReason: reason || "Keputusan skip dari awal proses",
-      ipfsCid: record.ipfs.cid,
-      ipfsUrl: record.ipfs.url,
+      ipfsCid: null,
+      ipfsUrl: null,
       txHash: null,
       txUrl: null,
       network: null,
@@ -668,18 +677,114 @@ router.post("/:id/stages/:stageName/skip", async (req, res) => {
       timestamp: record.timestamp,
       operator: req.user.name,
       payload: record.payload,
-      ipfsName: record.ipfs.name,
+      ipfsName: null,
       historyId: record.history.id,
-      mock: {
-        ipfs: record.ipfs.mock,
-      },
+      mock: null,
     });
 
     refreshAvailableStages(batch);
     batch.status = deriveBatchStatus(batch.stages);
 
     await updateBatch(batch);
-    return res.json(await finalizeBatchOnChainIfComplete(batch, req.user.name));
+    return res.json(await createFinalTraceJsonIfComplete(batch, req.user.name));
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/:id/blockchain", async (req, res) => {
+  try {
+    const { txHash, walletAddress, chainId } = req.body;
+    const cleanTxHash = typeof txHash === "string" ? txHash.trim() : "";
+
+    if (!cleanTxHash) {
+      return res.status(400).json({ message: "Tx hash wajib dikirim setelah transaksi MetaMask berhasil" });
+    }
+
+    const storedBatch = await getBatchById(req.params.id);
+
+    if (!storedBatch) {
+      return res.status(404).json({ message: "Batch tidak ditemukan" });
+    }
+
+    const batch = await normalizeAndPersistBatch(storedBatch);
+    const finalTrace = batch.trace?.finalTrace;
+
+    if (!finalTrace?.ipfsCid) {
+      return res.status(400).json({ message: "CID final Pinata belum tersedia untuk batch ini" });
+    }
+
+    const blockchainStatus = getBlockchainStatus();
+    const recordedAt = new Date().toISOString();
+    const effectiveChainId = Number(chainId || blockchainStatus.chainId);
+    const effectiveContractAddress = blockchainStatus.contractAddress;
+    const txUrl = getTxUrl(cleanTxHash);
+    const payload = {
+      eventType: "final_cid_anchored",
+      batchId: batch.id,
+      batchCode: batch.batchCode,
+      teaType: batch.teaType,
+      stageName: FINAL_TRACE_STAGE_NAME,
+      operator: req.user.name,
+      timestamp: recordedAt,
+      finalCid: finalTrace.ipfsCid,
+      ipfsUrl: finalTrace.ipfsUrl || null,
+      txHash: cleanTxHash,
+      txUrl,
+      walletAddress: walletAddress || null,
+      meta: {
+        blockchain: {
+          ...blockchainStatus,
+          chainId: effectiveChainId,
+          contractAddress: effectiveContractAddress,
+          transactionMode: "manual_metamask",
+          payloadMode: "pinata_cid_only",
+        },
+        action: "manual_wallet_anchor",
+      },
+    };
+
+    const history = await createHistoryEntry({
+      batchId: batch.id,
+      batchCode: batch.batchCode,
+      stageName: FINAL_TRACE_STAGE_NAME,
+      eventType: "final_cid_anchored",
+      action: "manual_wallet_anchor",
+      operator: req.user.name,
+      payload,
+      timestamp: recordedAt,
+      status: "anchored",
+      ipfsCid: finalTrace.ipfsCid,
+      ipfsUrl: finalTrace.ipfsUrl,
+      ipfsName: finalTrace.ipfsName,
+      txHash: cleanTxHash,
+      txUrl,
+      network: blockchainStatus.network,
+      chainId: effectiveChainId,
+      contractAddress: effectiveContractAddress,
+    });
+
+    batch.trace = {
+      ...(batch.trace || {}),
+      blockchainFinalization: {
+        ...(batch.trace?.blockchainFinalization || {}),
+        status: "anchored",
+        finalCid: finalTrace.ipfsCid,
+        finalIpfsUrl: finalTrace.ipfsUrl || null,
+        txHash: cleanTxHash,
+        txUrl,
+        network: blockchainStatus.network,
+        chainId: effectiveChainId,
+        contractAddress: effectiveContractAddress,
+        walletAddress: walletAddress || null,
+        transactionMode: "manual_metamask",
+        anchoredAt: recordedAt,
+        historyId: history.id,
+      },
+    };
+
+    await updateBatch(batch);
+    return res.json(batch);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -707,16 +812,10 @@ router.get("/:id/traceability", async (req, res) => {
       return res.status(404).json({ message: "Batch tidak ditemukan" });
     }
 
-    const normalized = await normalizeAndPersistBatch(batch);
+    const normalizedBatch = await normalizeAndPersistBatch(batch);
+    const normalized = await createFinalTraceJsonIfComplete(normalizedBatch, req.user.name);
 
-    return res.json({
-      batchCode: normalized.batchCode,
-      teaType: normalized.teaType,
-      createdAt: normalized.createdAt,
-      workflowMode: normalized.workflowMode || "dynamic-multi-path",
-      batchRegistration: normalized.trace.batchRegistration,
-      stages: normalized.stages,
-    });
+    return res.json(buildTraceabilityResponse(normalized, { hideSkipped: true }));
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

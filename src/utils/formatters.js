@@ -1,6 +1,6 @@
-export function formatDate(dateString) {
+export function formatDate(dateString, language = "id") {
   if (!dateString) return "-";
-  return new Intl.DateTimeFormat("id-ID", {
+  return new Intl.DateTimeFormat(language === "en" ? "en-US" : "id-ID", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(dateString));
@@ -35,7 +35,43 @@ export function stageStatusClasses(status) {
   }
 }
 
-export function stageStatusText(status) {
+export function statusText(status, language = "id") {
+  const labels = {
+    id: {
+      completed: "Selesai",
+      in_progress: "Berjalan",
+      draft: "Draft",
+    },
+    en: {
+      completed: "Completed",
+      in_progress: "In Progress",
+      draft: "Draft",
+    },
+  };
+
+  return labels[language]?.[status] || status || "-";
+}
+
+export function stageStatusText(status, language = "id") {
+  const labels = {
+    id: {
+      completed: "Tersimpan",
+      available: "Siap diproses",
+      skipped: "Di-skip",
+      pending: "Menunggu",
+    },
+    en: {
+      completed: "Stored",
+      available: "Ready",
+      skipped: "Skipped",
+      pending: "Waiting",
+    },
+  };
+
+  if (labels[language]?.[status]) {
+    return labels[language][status];
+  }
+
   switch (status) {
     case "completed":
       return "Tersimpan";

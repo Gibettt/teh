@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import DashboardLayout from "./layouts/DashboardLayout";
 import LoginPage from "./pages/LoginPage";
@@ -9,11 +10,13 @@ import NewBatchPage from "./pages/NewBatchPage";
 import BatchDetailPage from "./pages/BatchDetailPage";
 import StageFormPage from "./pages/StageFormPage";
 import TraceabilityPage from "./pages/TraceabilityPage";
+import PublicTraceabilityPage from "./pages/PublicTraceabilityPage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 
 const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  { path: "/trace/:id", element: <PublicTraceabilityPage /> },
   {
     element: <ProtectedRoute />,
     children: [
@@ -38,8 +41,10 @@ const router = createBrowserRouter([
 
 export default function App() {
   return (
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </LanguageProvider>
   );
 }
