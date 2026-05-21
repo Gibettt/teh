@@ -13,6 +13,7 @@ import TraceabilityPage from "./pages/TraceabilityPage";
 import PublicTraceabilityPage from "./pages/PublicTraceabilityPage";
 import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
+import ApiDocsPage from "./pages/ApiDocsPage";
 
 const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
           { path: "batches/:id/stages/:stageName", element: <StageFormPage /> },
           { path: "traceability", element: <TraceabilityPage /> },
           { path: "reports", element: <ReportsPage /> },
+          { path: "api-docs", element: <ApiDocsPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },

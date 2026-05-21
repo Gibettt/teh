@@ -29,6 +29,7 @@ VITE_SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
 VITE_WALLETCONNECT_PROJECT_ID=
 VITE_CONTRACT_ADDRESS=
 JWT_SECRET=super-secret-key
+API_DOCS_PASSWORD=api-docs-admin
 PINATA_JWT=
 PINATA_GATEWAY=
 CONTRACT_ADDRESS=
@@ -69,14 +70,14 @@ npm run dev
 ```
 
 Browser akan terbuka otomatis dari Vite, biasanya di `http://localhost:5173`.
+Endpoint `/api` juga aktif di server Vite yang sama, jadi login dan data Supabase bisa dipakai tanpa terminal API kedua.
+Menu **API Docs** di sidebar memakai `API_DOCS_PASSWORD` untuk membuka dokumentasi endpoint. Password ini hanya untuk dokumentasi web, bukan password tambahan untuk mobile app.
 
-Kalau butuh login, data batch, atau upload JSON final ke Pinata, jalankan API di terminal kedua:
+Kalau hanya ingin menjalankan API Express tanpa frontend:
 
 ```bash
 npm run api
 ```
-
-Frontend tetap memakai `/api` dan Vite akan meneruskannya ke `http://localhost:5000`.
 
 Kalau ingin menjalankan frontend dan backend dari satu server seperti production:
 

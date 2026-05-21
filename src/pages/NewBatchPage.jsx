@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import Topbar from "../components/Topbar";
 import api from "../services/api";
 import { useLanguage } from "../contexts/LanguageContext";
+import { TEA_TYPE_OPTIONS } from "../utils/teaFlows";
 
 export default function NewBatchPage() {
   const { openSidebar } = useOutletContext();
@@ -54,10 +55,9 @@ export default function NewBatchPage() {
             <div>
               <label className="label">{t("newBatch.type")}</label>
               <select className="input" name="teaType" value={form.teaType} onChange={handleChange}>
-                <option>Black Tea</option>
-                <option>Green Tea</option>
-                <option>Oolong Tea</option>
-                <option>White Tea</option>
+                {TEA_TYPE_OPTIONS.map((teaType) => (
+                  <option key={teaType}>{teaType}</option>
+                ))}
               </select>
             </div>
             <div>

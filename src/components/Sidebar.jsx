@@ -1,5 +1,6 @@
 import {
   Boxes,
+  BookOpen,
   ClipboardList,
   LayoutDashboard,
   Leaf,
@@ -17,6 +18,7 @@ const items = [
   { to: "/batches", icon: Boxes, labelKey: "sidebar.batchProduction" },
   { to: "/traceability", icon: SearchCode, labelKey: "common.traceability" },
   { to: "/reports", icon: ClipboardList, labelKey: "sidebar.activityLog" },
+  { to: "/api-docs", icon: BookOpen, labelKey: "sidebar.apiDocs" },
   { to: "/settings", icon: Settings, labelKey: "common.settings" },
 ];
 

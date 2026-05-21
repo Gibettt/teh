@@ -7,7 +7,7 @@ import { useLanguage } from "../contexts/LanguageContext";
 export default function LoginPage() {
   const { login, loading, isAuthenticated } = useAuth();
   const { t } = useLanguage();
-  const [form, setForm] = useState({ email: "admin@teh.local", password: "admin123" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
 
   if (isAuthenticated) {
@@ -73,10 +73,6 @@ export default function LoginPage() {
               {loading ? t("common.loading") : t("login.submit")}
             </button>
           </form>
-
-          <div className="surface-muted mt-6 rounded-[22px] p-4 text-sm text-slate-600">
-            {t("login.demo")} <span className="font-semibold">admin@teh.local</span> / <span className="font-semibold">admin123</span>
-          </div>
         </div>
       </div>
     </div>

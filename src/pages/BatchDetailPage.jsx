@@ -11,6 +11,7 @@ import Topbar from "../components/Topbar";
 import StageTimeline from "../components/StageTimeline";
 import ManualBlockchainAnchor from "../components/ManualBlockchainAnchor";
 import TraceabilityQrCode, { getPublicTraceabilityPath } from "../components/TraceabilityQrCode";
+import ProductionFlowGuide from "../components/ProductionFlowGuide";
 import api from "../services/api";
 import {
   formatDate,
@@ -77,51 +78,55 @@ export default function BatchDetailPage() {
       />
       <div className="space-y-5 p-3 sm:p-4 lg:space-y-6 lg:p-8">
         <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
-          <div className="card-paper p-4 sm:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="min-w-0">
-                <div className="text-sm text-slate-500">{t("batchDetail.code")}</div>
-                <h3 className="mt-2 break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{batch.batchCode}</h3>
-                <p className="mt-2 break-words text-sm text-slate-500">
-                  {batch.teaType} - {batch.gardenBlock || "-"}
-                </p>
+          <div className="space-y-6">
+            <div className="card-paper p-4 sm:p-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
+                  <div className="text-sm text-slate-500">{t("batchDetail.code")}</div>
+                  <h3 className="mt-2 break-words text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{batch.batchCode}</h3>
+                  <p className="mt-2 break-words text-sm text-slate-500">
+                    {batch.teaType} - {batch.gardenBlock || "-"}
+                  </p>
+                </div>
+                <span className={`${statusClasses(batch.status)} w-fit shrink-0`}>{statusText(batch.status, language)}</span>
               </div>
-              <span className={`${statusClasses(batch.status)} w-fit shrink-0`}>{statusText(batch.status, language)}</span>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:mt-6 xl:grid-cols-3">
+                <div className="surface-muted rounded-[20px] p-4 sm:rounded-[24px]">
+                  <p className="text-sm text-slate-500">{t("batchDetail.harvestDate")}</p>
+                  <p className="mt-2 font-semibold text-slate-900">{formatDate(batch.harvestDate || batch.createdAt, language)}</p>
+                </div>
+                <div className="surface-muted rounded-[20px] p-4 sm:rounded-[24px]">
+                  <p className="text-sm text-slate-500">{t("batchDetail.workflowMode")}</p>
+                  <p className="mt-2 font-semibold text-slate-900">{humanWorkflowMode()}</p>
+                  <p className="mt-1 text-xs text-slate-500">{t("batchDetail.activeNow", { count: availableStages.length })}</p>
+                </div>
+                <div className="surface-muted rounded-[20px] p-4 sm:col-span-2 sm:rounded-[24px] xl:col-span-1">
+                  <p className="text-sm text-slate-500">{t("batchDetail.finalCidSepolia")}</p>
+                  <p className="mt-2 break-all text-xs font-semibold text-slate-900">{blockchainFinalization?.txHash || "-"}</p>
+                  <p className="mt-2 text-xs text-slate-500">{t("batchDetail.network", { network: blockchainFinalization?.network || "sepolia" })}</p>
+                  {blockchainFinalization?.txUrl && (
+                    <a
+                      href={blockchainFinalization.txUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-sky-700"
+                    >
+                      <ExternalLink size={14} />
+                      {t("batchDetail.openFinalTx")}
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {actionError && (
+                <div className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {actionError}
+                </div>
+              )}
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:mt-6 xl:grid-cols-3">
-              <div className="surface-muted rounded-[20px] p-4 sm:rounded-[24px]">
-                <p className="text-sm text-slate-500">{t("batchDetail.harvestDate")}</p>
-                <p className="mt-2 font-semibold text-slate-900">{formatDate(batch.harvestDate || batch.createdAt, language)}</p>
-              </div>
-              <div className="surface-muted rounded-[20px] p-4 sm:rounded-[24px]">
-                <p className="text-sm text-slate-500">{t("batchDetail.workflowMode")}</p>
-                <p className="mt-2 font-semibold text-slate-900">{humanWorkflowMode()}</p>
-                <p className="mt-1 text-xs text-slate-500">{t("batchDetail.activeNow", { count: availableStages.length })}</p>
-              </div>
-              <div className="surface-muted rounded-[20px] p-4 sm:col-span-2 sm:rounded-[24px] xl:col-span-1">
-                <p className="text-sm text-slate-500">{t("batchDetail.finalCidSepolia")}</p>
-                <p className="mt-2 break-all text-xs font-semibold text-slate-900">{blockchainFinalization?.txHash || "-"}</p>
-                <p className="mt-2 text-xs text-slate-500">{t("batchDetail.network", { network: blockchainFinalization?.network || "sepolia" })}</p>
-                {blockchainFinalization?.txUrl && (
-                  <a
-                    href={blockchainFinalization.txUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-sky-700"
-                  >
-                    <ExternalLink size={14} />
-                    {t("batchDetail.openFinalTx")}
-                  </a>
-                )}
-              </div>
-            </div>
-
-            {actionError && (
-              <div className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {actionError}
-              </div>
-            )}
+            <ProductionFlowGuide teaType={batch.teaType} />
           </div>
 
           <div className="card p-4 sm:p-6">

@@ -6,7 +6,12 @@ const router = express.Router();
 
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email dan password wajib diisi" });
+    }
 
     const user = await findUserByCredentials(email, password);
 
@@ -35,7 +40,10 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ message: error.message });
+    console.error("Login error:", error);
+    return res.status(503).json({
+      message: "Login gagal karena koneksi atau konfigurasi Supabase bermasalah",
+    });
   }
 });
 
